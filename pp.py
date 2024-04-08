@@ -40,7 +40,7 @@ def get_loaders(path):
 
     with open(path, 'r', encoding='utf-8') as f:
 
-        for i in (range(100000)):
+        for i in (range(1000000)):
             sentences.append(f.readline())
 
     f.close()
