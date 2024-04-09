@@ -40,7 +40,7 @@ def get_loaders(path):
 
     with open(path, 'r', encoding='utf-8') as f:
 
-        for i in (range(1000000)):
+        for i in (range(100000)):
             sentences.append(f.readline())
 
     f.close()
@@ -50,6 +50,10 @@ def get_loaders(path):
     punctuations = ['।', ',', '.', '?', '!', ';', ':', '-', '(', ')', '{', '}', '[', ']', '‘', '’', '"', "'", f'\n']
 
     sens = [[token for token in sentence if token not in punctuations] for sentence in sens]
+    # build vocabulkary
+    vocab = (set([word for sentence in sens for word in sentence]))
+    vocab = list(vocab)
+
 
     char_to_idx = {}
     idx_to_char = {}
@@ -102,4 +106,21 @@ def get_loaders(path):
     dev_flat_loader = DataLoader(TensorDataset(dev_flat_tensor), batch_size=32, shuffle=False)
     test_flat_loader = DataLoader(TensorDataset(test_flat_tensor), batch_size=32, shuffle=False)
 
-    return train_loader, dev_loader, test_loader, train_flat_loader, dev_flat_loader, test_flat_loader, char_to_idx, idx_to_char, train_tensor
+    # print(len(train_ids))
+    sen_ids = get_char_idx(sens, char_to_idx)
+
+    nxt_input = []
+    nxt_output = []
+    emp = [0]*max_wd_len
+    for sen in sen_ids:
+        for i in range(6,len(sen)-1):
+            nxt_input.append(sen[i-6:i])
+            nxt_output.append(sen[i+1])
+            # if the next word is padded, then move on to the next sentence
+            if sen[i+1] == emp:
+                break
+
+    for i in zip(nxt_input[:20], nxt_output[:20]):
+        print(i)
+
+    return train_loader, dev_loader, test_loader, train_flat_loader, dev_flat_loader, test_flat_loader, char_to_idx, idx_to_char, nxt_input, nxt_output, vocab
