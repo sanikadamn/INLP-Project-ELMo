@@ -46,6 +46,23 @@ def split_into_characters(tokenized_data, word_length):
         character_vocab[char] = i + 1
     return sentences, character_vocab
 
+def convert_to_tensors(words, targets, vocab, character_vocab):
+    # convert the words and targets into tensors
+    words_tensor = []
+    for word in words:
+        word_tensor = []
+        for w in word:
+            w_tensor = []
+            for char in w:
+                w_tensor.append(character_vocab[char])
+            word_tensor.append(torch.tensor(w_tensor, dtype=torch.long))
+        words_tensor.append(word_tensor)
+    # convert the targets into a tensor
+    target_tensor = []
+    for target in targets:
+        target_tensor.append(torch.tensor(vocab[target], dtype=torch.long))
+    return words_tensor, target_tensor
+
 OUT_OF_VOCAB = '<OOV>'
 PAD_TAG = '<PAD>'
 START_TAG = '<BOS>'
@@ -65,18 +82,48 @@ class NextWordDataset(Dataset):
         self.sentences = tokenize(self.sentences)
         print("Tokenized data")
         if vocabulary is None:
-            self.vocab = build_vocab_from_iterator(self.sentences)
+            self.vocab = build_vocab_from_iterator(self.sentences, specials=[OUT_OF_VOCAB, PAD_TAG, START_TAG, END_TAG])
+            self.vocab.set_default_index(self.vocab[OUT_OF_VOCAB])
         else:
             self.vocab = vocabulary
 
         self.vocab.set_default_index(self.vocab['<OOV>'])
-        self.sentences, self.character_vocab = split_into_characters(self.sentences, 10)
-        print("Split into characters")
         # iterate over the dataset
     def __len__(self):
         return len(self.sentences)
 
     def __getitem__(self, idx):
-        return torch.tensor(self.vocab.lookup_indices(self.sentences[idx])), torch.tensor(self.character_vocab[self.sentences[idx]])
+        # what does this return
+        # return the sentence and the next word
+        # for self.vocab[0] it should return the out of vocab token
+        return torch.tensor([self.vocab[word] for word in self.sentences[idx]], dtype=torch.long)
+
+    
+    def format(self, batch, window_size) -> Tuple[torch.Tensor, torch.Tensor]:
+        # convert the batch into a tensor
+        # convert the batch into a tensor
+        # pad the batch
+        words = []
+        targets = []
+        # iterate over the batch
+        for sentence in batch:
+            for i in range(len(sentence) - window_size):
+                words.append(sentence[i:i+window_size])
+                targets.append(sentence[i+window_size])
+        # convert the words and targets into tensors
+        self.words, self.character_vocab = split_into_characters(words, 10)
+        # convert self.vocab into a dictionary and self.character_vocab into a dictionary
+        vocab = {}
+        for i, word in enumerate(self.vocab.get_itos()):
+            vocab[word] = i
+        character_vocab = {}
+        for i, char in enumerate(self.character_vocab.keys()):
+            character_vocab[char] = i
+        words_tensor, targets = convert_to_tensors(self.words, targets, vocab, character_vocab)
+        return words_tensor, targets, vocab, character_vocab
+
+
+
+
     
     
