@@ -1,8 +1,0 @@
-we have a text corpus thing
-for that we need to build a vocabulary of unique tokens
-each word will be represented as a vector of the letters or whatever
-need a mapping between letters and the indices that the letters have
-for training we need to convert the data into the next word format
-window of size something
-output while training willb e a softmax thing over the vocabulary
-during inference, pass the sentence (context) through the lstm thing and get the embedding for each word

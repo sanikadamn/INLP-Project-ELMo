@@ -1,13 +1,13 @@
 import torch
 import torch.nn as nn
-from preprocessing import NextWordDataset
+from preprocessing import CharLevelDataset
 from tqdm import tqdm
-
+from torch.utils.data import DataLoader, Dataset
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(42)
-
 # make the character embedding and convolutional layer with max pooling
+
+
 class CharCNN(nn.Module):
     def __init__(self, character_embedding_size, num_filters, kernel_size, max_word_length, char_vocab_size, word_embedding_dim, device=None):
         super(CharCNN, self).__init__()
@@ -52,36 +52,46 @@ class ELMo(nn.Module):
                                 cnn_config['kernel_size'], 
                                 cnn_config['max_word_length'], 
                                 cnn_config['char_vocab_size'],
-                                elmo_config['word_embedding_dim'],
+                                elmo_config['word_embedding_dim'],  
                                 device = device).to(device)
-        self.forward_lstm = nn.LSTM(elmo_config['word_embedding_dim'], int(elmo_config['word_embedding_dim']/2), 
-                                    1, bidirectional = False).to(device)
-        self.backward_lstm = nn.LSTM(elmo_config['word_embedding_dim'], int(elmo_config['word_embedding_dim']/2),
-                                    1, bidirectional = False).to(device)
+        
         # based on the number of layers as passed in the argument, sequentially have that many layers
-        self.forward_lstms = nn.ModuleList([self.forward_lstm for _ in range(elmo_config['num_layers'])])
-        self.backward_lstms = nn.ModuleList([self.backward_lstm for _ in range(elmo_config['num_layers'])])
+
+        self.forward_lstm = nn.LSTM(elmo_config['word_embedding_dim'], elmo_config['word_embedding_dim'], num_layers=1, batch_first=True, bidirectional=False)
+        self.backward_lstm = nn.LSTM(elmo_config['word_embedding_dim'], elmo_config['word_embedding_dim'], num_layers=1, batch_first=True, bidirectional=False)
+        self.forward_lstms = nn.ModuleList([nn.LSTM(elmo_config['word_embedding_dim'], elmo_config['word_embedding_dim'], num_layers=1, batch_first=True, bidirectional=False) for i in range(elmo_config['num_layers'])])
+        self.backward_lstms = nn.ModuleList([nn.LSTM(elmo_config['word_embedding_dim'], elmo_config['word_embedding_dim'], num_layers=1, batch_first=True, bidirectional=False) for i in range(elmo_config['num_layers'])])
         self.num_layers = elmo_config['num_layers']
-        self.fc = nn.Linear(elmo_config['word_embedding_dim'], elmo_config['vocab_size'])
+        self.fc_forward = nn.Linear(elmo_config['word_embedding_dim'], elmo_config['vocab_size'])
+        self.fc_backward = nn.Linear(elmo_config['word_embedding_dim'], elmo_config['vocab_size'])
         
     def forward(self, x):
         # character cnn
         # convert x to tensor
-        x = torch.stack(x, dim=0)
+        # x = torch.stack(x, dim=0)
         x = x.permute(1, 0, 2)
         x = [self.char_cnn(word) for word in x]
         # lstm1
         x = torch.stack(x, dim=1) 
-        x = x.permute(1, 0, 2) 
+
+        final_embeddings = []
+        forward_output = x
+        # flip once, pass through backward embedding thing
+        backward_output = torch.flip(x, [1])
+        # for final embeddings, flip again to make sure words align
+        final_embeddings.append(torch.cat([forward_output, torch.flip(backward_output, [1])], dim=2))
         
-        lstm_output = x
         for i in range(self.num_layers):
-            forward_lstm_output, _ = self.forward_lstms[i](lstm_output)
-            backward_lstm_output, _ = self.backward_lstms[i](torch.flip(lstm_output, [1]))
-            backward_lstm_output = torch.flip(backward_lstm_output, [1])
-            lstm_output = torch.cat((forward_lstm_output, backward_lstm_output), dim = 2)
+            forward_output, _ = self.forward_lstms[i](forward_output)
+            
+            # passed through the backward lstm correctly
+            backward_output, _ = self.backward_lstms[i](backward_output)
+            # appending flipped so it matches
+            final_embeddings.append(torch.cat([forward_output, torch.flip(backward_output, [1])], dim=2))
         
-        x = torch.mean(lstm_output, dim = 1)
-        x = self.fc(x)
-        return x, lstm_output
-     
+        forward_output = self.fc_forward(forward_output)
+        # flip backward
+        # final backward output is correct
+        backward_output = torch.flip(backward_output, [1])
+        backward_output = self.fc_backward(backward_output)
+        return forward_output, backward_output, final_embeddings
