@@ -1,6 +1,7 @@
 from indicnlp.tokenize import indic_tokenize
 import torch
 from torch.utils.data import DataLoader, Dataset
+import torch.nn as nn
 from tqdm import tqdm
 import re
 from typing import List, Tuple, Optional
@@ -62,3 +63,24 @@ class SentimentAnalysisDataset(Dataset):
         # convert labels to tensors
         labels = torch.stack(labels)
         return sentences, labels
+    
+
+class EmbeddingDataset(Dataset):
+    def __init__(self, data, labels, word_vocab: WordLevelVocab):
+        self.data = tokenize(data)
+        self.labels = labels
+        self.word_vocab = word_vocab
+        self.max_seq_length = 20
+    def __len__(self):
+        return len(self.data)   
+    def __getitem__(self, idx):
+        return torch.tensor([self.word_vocab.word_to_index(word) for word in self.data[idx]]), torch.tensor(self.labels[idx])
+    def collate_fn(self, batch):
+        sentences, labels = zip(*batch)
+        # add <BOS> and <EOS> tokens
+        sentences = [torch.cat((torch.tensor([self.word_vocab.word_to_index('<BOS>')]), sentence, torch.tensor([self.word_vocab.word_to_index('<EOS>')]))) for sentence in sentences]
+        # pad sentences
+        sentences = nn.utils.rnn.pad_sequence(sentences, batch_first=True, padding_value=self.word_vocab.word_to_index('<PAD>'))
+        return sentences, torch.tensor(labels)
+
+        

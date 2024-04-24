@@ -2,3 +2,4 @@
 ./preprocessing_marathi.ipynb
 ./sentence_length_dict.pkl
 ELMo/elmo_epoch_*.pt
+Sentiment_Analysis/wandb/*
