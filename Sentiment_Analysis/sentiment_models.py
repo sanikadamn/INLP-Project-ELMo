@@ -14,7 +14,7 @@ class SentimentAnalysis(nn.Module):
         super(SentimentAnalysis, self).__init__()
         self.elmo = elmo
         self.lambdas = nn.Parameter(torch.randn(3))
-        self.lstm = nn.LSTM(embedding_dim, embedding_dim, batch_first=True, bidirectional=True, num_layers=2)
+        self.lstm = nn.LSTM(embedding_dim, embedding_dim, batch_first=True, bidirectional=True, num_layers=1)
         self.fc = nn.Linear(embedding_dim*2, embedding_dim)
         self.fc2 = nn.Linear(embedding_dim, num_classes)
         self.relu = nn.ReLU()
@@ -40,7 +40,7 @@ class SentimentAnalysis_WithoutELMo(nn.Module):
     def __init__(self, embedding_dim, num_classes, word_vocab):
         super(SentimentAnalysis_WithoutELMo, self).__init__()
         self.embedding = nn.Embedding(word_vocab.num_words, embedding_dim)
-        self.lstm = nn.LSTM(embedding_dim, embedding_dim, batch_first=True, bidirectional=True, num_layers=2)
+        self.lstm = nn.LSTM(embedding_dim, embedding_dim, batch_first=True, bidirectional=True, num_layers=1)
         self.fc = nn.Linear(embedding_dim*2, embedding_dim)
         self.fc2 = nn.Linear(embedding_dim, num_classes)
         self.relu = nn.ReLU()
